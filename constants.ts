@@ -1,0 +1,41 @@
+import { Behavior, Badge, Deal } from './types';
+
+export const BEHAVIORS: Behavior[] = [
+  { id: 'lane_leaper', name: 'Lane Leaper', description: 'Changing lanes without looking.', icon: '⚡' },
+  { id: 'unhinged_honker', name: 'Unhinged Honker', description: 'Honking at nothing.', icon: '📢' },
+  { id: 'texting_zombie', name: 'Texting Zombie', description: 'Eyes on the phone, not the road.', icon: '🧟' },
+  { id: 'road_rager', name: 'Road Rager', description: 'Yelling or aggressive driving.', icon: '🤬' },
+  { id: 'no_signal_phantom', name: 'No-Signal Phantom', description: 'Never uses turn signals.', icon: '👻' },
+  { id: 'stop_sign_skipper', name: 'Stop Sign Skipper', description: 'Rolling through stops.', icon: '🛑' },
+  { id: 'parking_menace', name: 'Parking Menace', description: 'Taking two spots or blocking.', icon: '🅿️' },
+  { id: 'speed_demon', name: 'Speed Demon', description: 'Way too fast for conditions.', icon: '🏎️' },
+  { id: 'turtle_mode', name: 'Turtle Mode', description: 'Driving painfully slow.', icon: '🐢' },
+  { id: 'traffic_blocker', name: 'Traffic Blocker', description: 'Blocking the box.', icon: '🧱' },
+  { id: 'other_custom', name: 'Other', description: 'Something else? Write it down.', icon: '✍️' },
+];
+
+export const INITIAL_BADGES: Badge[] = [
+  { id: 'first_catch', name: 'First Catch', description: 'Your first-ever report.', unlocked: false, icon: '🛡️', requiredBehaviorId: undefined },
+  { id: 'lane_leaper', name: 'Weaver', description: 'Caught a Lane Leaper.', unlocked: false, icon: '⚡', requiredBehaviorId: 'lane_leaper' },
+  { id: 'honker', name: 'Silencer', description: 'Caught an Unhinged Honker.', unlocked: false, icon: '📢', requiredBehaviorId: 'unhinged_honker' },
+  { id: 'zombie', name: 'Eye Opener', description: 'Caught a Texting Zombie.', unlocked: false, icon: '🧟', requiredBehaviorId: 'texting_zombie' },
+  { id: 'phantom', name: 'Ghostbuster', description: 'Caught a No-Signal Phantom.', unlocked: false, icon: '👻', requiredBehaviorId: 'no_signal_phantom' },
+  { id: 'legendary', name: 'LEGENDARY MIAMI DRIVER', description: 'Caught a driver doing EVERYTHING wrong.', unlocked: false, icon: '👑', requiredBehaviorId: undefined },
+];
+
+export const INITIAL_DEALS: Deal[] = [
+  { id: 'joe_crab', partnerName: "Joe's Stone Crab Shack", offer: "Free Key Lime Pie", description: "With any entree purchase", qrCodeId: "PARTNER_JOE", claimed: false, color: "bg-red-50", location: "11 Washington Ave" },
+  { id: 'cafe_cubano', partnerName: "Café Cubano Express", offer: "BOGO Colada", description: "Buy one get one free", qrCodeId: "PARTNER_CUBANO", claimed: false, color: "bg-orange-50", location: "8th St & Ocean Dr" },
+  { id: 'ocean_tacos', partnerName: "Ocean Drive Tacos", offer: "15% Off Tacos", description: "Valid for lunch only", qrCodeId: "PARTNER_TACOS", claimed: false, color: "bg-yellow-50", location: "Lincoln Road Mall" },
+];
+
+// Mock Heatmap Data points (Real Miami Coordinates)
+// Center roughly 25.774, -80.193
+const MIAMI_LAT = 25.774;
+const MIAMI_LNG = -80.133; // South Beachish
+
+export const MOCK_HEAT_POINTS = Array.from({ length: 40 }, () => ({
+  lat: MIAMI_LAT + (Math.random() - 0.5) * 0.04,
+  lng: MIAMI_LNG + (Math.random() - 0.5) * 0.04,
+  intensity: Math.floor(Math.random() * 10) + 1,
+}));

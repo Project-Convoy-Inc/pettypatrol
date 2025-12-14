@@ -1,0 +1,8 @@
+{
+  "name": "Petty Patrol",
+  "description": "A gamified app to catch bad drivers and score deals. Stay Safe. Stay Petty.",
+  "requestFramePermissions": [
+    "camera",
+    "geolocation"
+  ]
+}
