@@ -12,5 +12,15 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, '.'),
     }
-  }
+  },
+  // Ensure public directory is properly handled
+  publicDir: 'public',
+  build: {
+    // Ensure manifest and service worker are included in build
+    rollupOptions: {
+      input: {
+        main: path.resolve(__dirname, 'index.html'),
+      },
+    },
+  },
 });

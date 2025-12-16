@@ -6,9 +6,36 @@ import { trackView, trackEvent } from './services/posthog';
 import BottomNav from './components/BottomNav';
 import Button from './components/Button';
 import HeatMap from './components/HeatMap';
-import { Camera, X, Check, Award, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon } from 'lucide-react';
+import { ErrorBoundary } from './components/ErrorBoundary';
+import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 import L from 'leaflet';
+
+// --- Error Toast Component ---
+interface ErrorToastProps {
+  message: string | null;
+  onClose: () => void;
+}
+
+const ErrorToast: React.FC<ErrorToastProps> = ({ message, onClose }) => {
+  if (!message) return null;
+
+  return (
+    <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50 animate-slide-down">
+      <div className="bg-red-600 text-white px-6 py-4 rounded-lg shadow-lg flex items-center gap-3 max-w-sm">
+        <AlertCircle className="w-5 h-5 shrink-0" />
+        <p className="flex-1 text-sm font-medium">{message}</p>
+        <button
+          onClick={onClose}
+          className="shrink-0 hover:bg-red-700 rounded p-1 transition-colors"
+          aria-label="Close"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // --- Helper: Leaflet Picker Component ---
 
@@ -129,12 +156,16 @@ const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
       minHeight: '100dvh'
     }}
   >
-    <div className="mb-8 p-6 bg-white rounded-full shadow-xl">
-      <Award size={64} className="text-red-600" />
+    <div className="mb-8 p-4 bg-white rounded-full shadow-xl flex items-center justify-center">
+      <img 
+        src="/mascot.png" 
+        alt="Petty Patrol Mascot" 
+        className="w-32 h-32 object-contain" 
+      />
     </div>
     <h1 className="text-4xl font-display font-black mb-4 italic">WELCOME TO THE CHAOS</h1>
     <p className="text-lg font-medium opacity-90 mb-8 max-w-xs">
-      Catch bad drivers. Claim sweet deals. Don't be an asshole while doing it.
+      Catch drivers being bad. Claim sweet deals. Have some fun.
     </p>
     <div className="space-y-4 w-full max-w-xs text-left bg-red-700/30 p-6 rounded-2xl mb-8 border border-red-400/30">
       <div className="flex gap-3">
@@ -146,6 +177,9 @@ const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
          <p className="text-sm">Scan Partner QR codes for free stuff.</p>
       </div>
     </div>
+    <p className="text-sm font-medium opacity-90 mb-4 italic">
+      You've been there too, but not today 😜
+    </p>
     <Button onClick={onComplete} variant="secondary" size="lg" fullWidth>
       Let's Roll
     </Button>
@@ -189,9 +223,71 @@ const App: React.FC = () => {
   // 500 points notice state
   const [show500PointsNotice, setShow500PointsNotice] = useState(false);
   
+  // Error state for user-friendly error messages
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  
+  // Helper function to show error messages
+  const showError = (message: string) => {
+    setErrorMessage(message);
+    // Auto-dismiss after 5 seconds
+    setTimeout(() => setErrorMessage(null), 5000);
+  };
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
   const galleryInputRef = useRef<HTMLInputElement>(null);
   const feedbackFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load persisted data from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedReports = localStorage.getItem('pettypatrol_reports');
+      if (savedReports) {
+        const parsed = JSON.parse(savedReports);
+        setReports(parsed);
+      }
+
+      const savedBadges = localStorage.getItem('pettypatrol_badges');
+      if (savedBadges) {
+        const parsed = JSON.parse(savedBadges);
+        setBadges(parsed);
+      }
+
+      const savedDeals = localStorage.getItem('pettypatrol_deals');
+      if (savedDeals) {
+        const parsed = JSON.parse(savedDeals);
+        setDeals(parsed);
+      }
+    } catch (error) {
+      console.error('Error loading persisted data:', error);
+    }
+  }, []);
+
+  // Persist reports to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pettypatrol_reports', JSON.stringify(reports));
+    } catch (error) {
+      console.error('Error saving reports:', error);
+    }
+  }, [reports]);
+
+  // Persist badges to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pettypatrol_badges', JSON.stringify(badges));
+    } catch (error) {
+      console.error('Error saving badges:', error);
+    }
+  }, [badges]);
+
+  // Persist deals to localStorage
+  useEffect(() => {
+    try {
+      localStorage.setItem('pettypatrol_deals', JSON.stringify(deals));
+    } catch (error) {
+      console.error('Error saving deals:', error);
+    }
+  }, [deals]);
 
   // Update edit state when editingReport changes
   useEffect(() => {
@@ -241,32 +337,12 @@ const App: React.FC = () => {
 
   const handleGalleryClick = () => {
     trackEvent('capture_initiated', { method: 'gallery' });
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleGalleryClick',message:'Gallery click handler called',data:{hasRef:!!galleryInputRef.current,isConnected:galleryInputRef.current?.isConnected,disabled:galleryInputRef.current?.disabled,type:galleryInputRef.current?.type},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'})}).catch(()=>{});
-    // #endregion
-    console.log('handleGalleryClick called, ref exists:', !!galleryInputRef.current);
     if (galleryInputRef.current) {
-      console.log('Input element:', {
-        isConnected: galleryInputRef.current.isConnected,
-        disabled: galleryInputRef.current.disabled,
-        type: galleryInputRef.current.type,
-        accept: galleryInputRef.current.accept,
-        parentElement: !!galleryInputRef.current.parentElement
-      });
       try {
         galleryInputRef.current.click();
-        console.log('click() method called successfully');
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleGalleryClick:clickCalled',message:'Input click() method executed',data:{},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
       } catch (err: any) {
-        console.error('Error calling click():', err);
-        // #region agent log
-        fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:handleGalleryClick:clickError',message:'Error calling click()',data:{error:err?.message || 'unknown'},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H3'})}).catch(()=>{});
-        // #endregion
+        console.error('Error opening gallery:', err);
       }
-    } else {
-      console.error('galleryInputRef.current is null!');
     }
   };
 
@@ -337,7 +413,7 @@ const App: React.FC = () => {
       } else {
         // Stay on analyzing screen but show error with PRD text
         setTimeout(() => {
-            alert("Hmm. That's not a plate or a partner QR.");
+            showError("Hmm. That's not a plate or a partner QR.");
             setView(ViewState.HOME);
         }, 500);
       }
@@ -358,7 +434,7 @@ const App: React.FC = () => {
             partnerName: matchedDeal.partnerName,
             alreadyClaimed: true 
           });
-          alert("You already claimed this deal!");
+          showError("You already claimed this deal!");
           setView(ViewState.DEALS);
           return;
       }
@@ -376,7 +452,7 @@ const App: React.FC = () => {
       setView(ViewState.CELEBRATION);
     } else {
        trackEvent('qr_code_invalid', { qrValue });
-       alert("Oops! That QR code isn't from one of our partners.");
+       showError("Oops! That QR code isn't from one of our partners.");
        setView(ViewState.HOME);
     }
   };
@@ -412,11 +488,11 @@ const App: React.FC = () => {
     
     if (selectedBehaviors.length === 0) return;
     if (isOtherOnly && !customNote.trim()) {
-        alert("Please describe what they did.");
+        showError("Please describe what they did.");
         return;
     }
     if (!selectedLocation) {
-        alert("Please tap the map to pin a location.");
+        showError("Please tap the map to pin a location.");
         return;
     }
 
@@ -566,10 +642,6 @@ const App: React.FC = () => {
                 tabIndex={-1}
                 accept="image/*"
                 onChange={(e) => {
-                  // #region agent log
-                  fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:galleryInput:onChange',message:'Gallery input onChange fired',data:{hasFiles:!!e.target.files?.length},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
-                  // #endregion
-                  console.log('Gallery input onChange, files:', e.target.files?.length);
                   handleFileChange(e, false);
                 }}
               />
@@ -680,11 +752,11 @@ const App: React.FC = () => {
                         size="lg" 
                         onClick={() => {
                             if (manualPlateText.trim().length < 2) {
-                                alert("Please enter a valid plate number (letters and numbers only).");
+                                showError("Please enter a valid plate number (letters and numbers only).");
                                 return;
                             }
                             if (!selectedLocation) {
-                                alert("Please select a location first.");
+                                showError("Please select a location first.");
                                 return;
                             }
                             setAnalysisResult({
@@ -1258,7 +1330,7 @@ const App: React.FC = () => {
                     setView(ViewState.EDITOR);
                   }}
                 >
-                  View My Reports
+                  View my PettyDex reports
                 </Button>
               </div>
             </div>
@@ -1277,12 +1349,11 @@ const App: React.FC = () => {
                             <span className="font-bold text-zinc-700">How to Play</span>
                             <ChevronRight size={16} className="text-zinc-400" />
                         </button>
-                        <button onClick={() => setView(ViewState.BADGES)} className="w-full p-4 text-left flex justify-between items-center hover:bg-zinc-50 active:bg-zinc-100 transition-colors">
-                            <span className="font-bold text-zinc-700">PettyDex Progress</span>
-                            <ChevronRight size={16} className="text-zinc-400" />
-                        </button>
                         <button onClick={() => { setEditingReport(null); setView(ViewState.EDITOR); }} className="w-full p-4 text-left flex justify-between items-center hover:bg-zinc-50 active:bg-zinc-100 transition-colors">
-                            <span className="font-bold text-zinc-700">My Reports</span>
+                            <div className="flex flex-col items-start">
+                                <span className="font-bold text-zinc-700">PettyDex: My Reports</span>
+                                <span className="text-xs text-zinc-500 mt-0.5">This is your Rolodex of bad drivers you've caught.</span>
+                            </div>
                             <ChevronRight size={16} className="text-zinc-400" />
                         </button>
                     </div>
@@ -1305,7 +1376,7 @@ const App: React.FC = () => {
                                             coordinates: { lat: 25.774 + (i * 0.001), lng: -80.133 + (i * 0.001) }
                                         }));
                                         setReports([...reports, ...mockReports]);
-                                        alert(`Added 10 mock reports! Total points: ${(reports.length + 10) * 50}`);
+                                        showError(`Added 10 mock reports! Total points: ${(reports.length + 10) * 50}`);
                                     }}
                                     variant="secondary"
                                     fullWidth
@@ -1317,7 +1388,7 @@ const App: React.FC = () => {
                                     onClick={() => {
                                         setReports([]);
                                         setShow500PointsNotice(false);
-                                        alert('All reports cleared!');
+                                        showError('All reports cleared!');
                                     }}
                                     variant="outline"
                                     fullWidth
@@ -1328,7 +1399,7 @@ const App: React.FC = () => {
                                 <Button
                                     onClick={() => {
                                         setShow500PointsNotice(false);
-                                        alert('500 points notice reset! Navigate to Deals screen to see it again.');
+                                        showError('500 points notice reset! Navigate to Deals screen to see it again.');
                                     }}
                                     variant="outline"
                                     fullWidth
@@ -1355,7 +1426,6 @@ const App: React.FC = () => {
                         <Button 
                             onClick={() => {
                                 setFeedbackText('');
-                                setFeedbackImage(null);
                                 setView(ViewState.FEEDBACK);
                             }} 
                             variant="secondary" 
@@ -1412,22 +1482,9 @@ const App: React.FC = () => {
           );
 
       case ViewState.FEEDBACK:
-        const handleFeedbackImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-          const file = event.target.files?.[0];
-          if (!file) return;
-          
-          const reader = new FileReader();
-          reader.onloadend = () => {
-            setFeedbackImage(reader.result as string);
-          };
-          reader.readAsDataURL(file);
-          event.target.value = '';
-        };
-
         const handleSubmitFeedback = () => {
           // Track feedback submission
           trackEvent('feedback_submitted', {
-            hasScreenshot: !!feedbackImage,
             feedbackLength: feedbackText.length,
           });
           
@@ -1436,8 +1493,7 @@ const App: React.FC = () => {
             `${feedbackText}\n\n` +
             `---\n` +
             `App Version: v1.0.0-beta\n` +
-            `Platform: ${navigator.userAgent}\n` +
-            (feedbackImage ? `\n[Screenshot attached - please attach the saved screenshot to this email]` : '')
+            `Platform: ${navigator.userAgent}\n`
           );
           
           window.location.href = `mailto:pettypatrolsupport@projectconvoy.info?subject=${subject}&body=${body}`;
@@ -1473,48 +1529,10 @@ const App: React.FC = () => {
                 />
               </div>
 
-              {/* Screenshot Attachment */}
-              <div className="mb-6">
-                <p className="block text-sm font-bold text-zinc-900 mb-2">
-                  Attach Screenshot <span className="text-zinc-400 font-normal">(optional)</span>
-                </p>
-
-                {feedbackImage ? (
-                  <div className="relative">
-                    <img 
-                      src={feedbackImage} 
-                      alt="Feedback screenshot" 
-                      className="w-full aspect-video object-cover rounded-xl border-2 border-zinc-200"
-                    />
-                    <button 
-                      onClick={() => setFeedbackImage(null)}
-                      className="absolute top-2 right-2 w-8 h-8 bg-red-600 rounded-full flex items-center justify-center text-white shadow-lg hover:bg-red-700 transition-colors"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <label className="relative w-full p-6 border-2 border-dashed border-zinc-300 rounded-xl flex flex-col items-center gap-2 hover:border-red-400 hover:bg-red-50/50 transition-colors cursor-pointer">
-                    <input 
-                      type="file" 
-                      ref={feedbackFileInputRef}
-                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
-                      accept="image/*"
-                      onChange={handleFeedbackImageChange}
-                    />
-                    <div className="w-12 h-12 bg-zinc-100 rounded-full flex items-center justify-center pointer-events-none">
-                      <ImageIcon size={24} className="text-zinc-400" />
-                    </div>
-                    <span className="text-sm font-medium text-zinc-500 pointer-events-none">Tap to add a screenshot</span>
-                  </label>
-                )}
-              </div>
-
               {/* Instructions */}
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4 mb-6">
                 <p className="text-sm text-yellow-800">
-                  <span className="font-bold">Note:</span> When you submit, your email app will open with your feedback pre-filled. 
-                  {feedbackImage && " Don't forget to attach the screenshot you selected!"}
+                  <span className="font-bold">Note:</span> When you submit, your email app will open with your feedback pre-filled. Please provide screenshots in your email if relevant.
                 </p>
               </div>
 
@@ -1551,11 +1569,11 @@ const App: React.FC = () => {
         const handleSaveReport = () => {
           if (!editingReport) return;
           if (editBehaviors.length === 0) {
-            alert("Please select at least one behavior.");
+            showError("Please select at least one behavior.");
             return;
           }
           if (!editLocation) {
-            alert("Please select a location.");
+            showError("Please select a location.");
             return;
           }
 
@@ -1790,6 +1808,12 @@ const App: React.FC = () => {
   return (
     <div className="max-w-md mx-auto min-h-screen bg-zinc-50 shadow-2xl relative overflow-hidden">
       {renderContent()}
+      
+      {/* Error Toast */}
+      <ErrorToast 
+        message={errorMessage} 
+        onClose={() => setErrorMessage(null)} 
+      />
       
       {/* Hide Bottom Nav on Onboarding, Capture Process, Feedback, and Editor Edit Mode */}
       {view !== ViewState.ONBOARDING && 

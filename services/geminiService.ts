@@ -31,11 +31,11 @@ export async function analyzeImage(base64Content: string, mimeType: string): Pro
     };
   } catch (error) {
     console.error('Error analyzing image:', error);
-    // Fallback for development
+    // Return INVALID type instead of throwing to provide better UX
     return {
-      type: 'LICENSE_PLATE',
-      value: 'MIA305',
-      confidence: 0.85,
+      type: 'INVALID',
+      value: '',
+      confidence: 0.0,
     };
   }
 }

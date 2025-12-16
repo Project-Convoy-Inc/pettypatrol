@@ -4,6 +4,15 @@ export default async function handler(
   req: VercelRequest,
   res: VercelResponse
 ) {
+  // Set CORS headers
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'POST, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(200).end();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -12,6 +21,18 @@ export default async function handler(
 
   if (!base64Content || !mimeType) {
     return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  // Validate base64 content size (max 10MB base64 = ~7.5MB actual)
+  const maxBase64Size = 10 * 1024 * 1024; // 10MB
+  if (base64Content.length > maxBase64Size) {
+    return res.status(400).json({ error: 'Image too large. Maximum size is 10MB' });
+  }
+
+  // Validate mime type
+  const allowedMimeTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+  if (!allowedMimeTypes.includes(mimeType)) {
+    return res.status(400).json({ error: 'Invalid image type. Only JPEG, PNG, and WebP are supported' });
   }
 
   const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
@@ -24,6 +45,10 @@ export default async function handler(
   const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
 
   try {
+    // Add timeout to prevent hanging requests (30 seconds)
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 30000);
+
     const response = await fetch(
       `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
       {
@@ -31,6 +56,7 @@ export default async function handler(
         headers: {
           'Content-Type': 'application/json',
         },
+        signal: controller.signal,
         body: JSON.stringify({
           contents: [{
             parts: [{
@@ -53,8 +79,24 @@ Image data: data:${mimeType};base64,${base64Content}`
       }
     );
 
+    clearTimeout(timeoutId);
+
     if (!response.ok) {
-      throw new Error(`Gemini API error: ${response.statusText}`);
+      const errorText = await response.text().catch(() => 'Unknown error');
+      console.error('Gemini API error:', response.status, errorText);
+      
+      // Provide user-friendly error messages
+      if (response.status === 429) {
+        return res.status(429).json({ error: 'Rate limit exceeded. Please try again later.' });
+      }
+      if (response.status === 400) {
+        return res.status(400).json({ error: 'Invalid request. Please check your image.' });
+      }
+      if (response.status === 401 || response.status === 403) {
+        return res.status(500).json({ error: 'API authentication failed' });
+      }
+      
+      throw new Error(`Gemini API error: ${response.status} ${response.statusText}`);
     }
 
     const data = await response.json();
@@ -101,9 +143,20 @@ Image data: data:${mimeType};base64,${base64Content}`
       value: '',
       confidence: 0.0,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error analyzing image:', error);
-    return res.status(500).json({ error: 'Failed to analyze image' });
+    
+    // Handle timeout
+    if (error.name === 'AbortError') {
+      return res.status(504).json({ error: 'Request timeout. Please try again.' });
+    }
+    
+    // Handle network errors
+    if (error.message?.includes('fetch')) {
+      return res.status(503).json({ error: 'Service temporarily unavailable. Please try again later.' });
+    }
+    
+    return res.status(500).json({ error: 'Failed to analyze image. Please try again.' });
   }
 }
 
