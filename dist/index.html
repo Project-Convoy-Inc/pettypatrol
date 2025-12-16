@@ -31,7 +31,7 @@
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
     
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
+    <link rel="manifest" href="/assets/manifest-CkC6yV_8.json" />
     
     <!-- Preconnect to external resources for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -45,22 +45,18 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin="" />
     
     <!-- App Styles -->
-    <link rel="stylesheet" href="/index.css" />
     
     <style>
-      /* Custom font for that "game" feel */
       @import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;600;700&family=Inter:wght@400;600;800&display=swap');
-      
+      /* Custom font for that "game" feel */
       body {
         font-family: 'Inter', sans-serif;
         background-color: #f9fafb;
         -webkit-tap-highlight-color: transparent;
       }
-      
       .font-display {
         font-family: 'Chakra Petch', sans-serif;
       }
-
       /* Hide scrollbar for clean UI */
       .no-scrollbar::-webkit-scrollbar {
         display: none;
@@ -69,13 +65,11 @@
         -ms-overflow-style: none;
         scrollbar-width: none;
       }
-
       /* Fix for Leaflet tiles in some containers */
       .leaflet-container {
         z-index: 0;
         border-radius: 0.75rem; /* rounded-xl */
       }
-      
       /* iOS splash screen background while loading */
       #root:empty {
         display: flex;
@@ -85,7 +79,6 @@
         min-height: 100dvh;
         background-color: #dc2626;
       }
-      
       #root:empty::after {
         content: '';
         width: 48px;
@@ -95,13 +88,13 @@
         border-radius: 50%;
         animation: spin 1s linear infinite;
       }
-      
       @keyframes spin {
         to { transform: rotate(360deg); }
       }
     </style>
     
     <!-- Import Map for ES Modules -->
+
     <script type="importmap">
 {
   "imports": {
@@ -116,10 +109,11 @@
   }
 }
     </script>
+    <script type="module" crossorigin src="/assets/index-gaySqAZN.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-fu4v7VBk.css">
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
     
     <!-- Service Worker Registration -->
     <script>

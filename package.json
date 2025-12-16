@@ -9,16 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@google/genai": "^1.33.0",
+    "d3": "^7.9.0",
+    "leaflet": "1.9.4",
+    "lucide-react": "^0.561.0",
+    "posthog-js": "^1.306.2",
     "react": "^19.2.3",
     "react-dom": "^19.2.3",
-    "@google/genai": "^1.33.0",
-    "lucide-react": "^0.561.0",
-    "d3": "^7.9.0",
-    "recharts": "^3.5.1",
-    "leaflet": "1.9.4"
+    "recharts": "^3.5.1"
   },
   "devDependencies": {
     "@types/node": "^22.14.0",
+    "@vercel/node": "^3.0.0",
     "@vitejs/plugin-react": "^5.0.0",
     "typescript": "~5.8.2",
     "vite": "^6.2.0"

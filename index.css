@@ -1,0 +1,262 @@
+/* ==========================================================================
+   Petty Patrol - Mobile Web App Styles
+   Supports iOS 12+ and Android 8+ (devices from 2018+)
+   ========================================================================== */
+
+/* --------------------------------------------------------------------------
+   CSS Custom Properties for Safe Areas
+   These enable proper spacing on notched devices (iPhone X and later)
+   -------------------------------------------------------------------------- */
+:root {
+  /* Safe area insets - fallback to 0 for older browsers */
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
+  
+  /* App-specific spacing that accounts for safe areas */
+  --bottom-nav-height: 4.5rem; /* 72px - matches py-2 + icon + text */
+  --bottom-nav-total: calc(var(--bottom-nav-height) + var(--safe-area-inset-bottom));
+}
+
+/* --------------------------------------------------------------------------
+   Base HTML/Body Styles for Mobile
+   -------------------------------------------------------------------------- */
+html {
+  /* Prevent pull-to-refresh on mobile */
+  overscroll-behavior-y: contain;
+  
+  /* Enable smooth scrolling */
+  scroll-behavior: smooth;
+  
+  /* Prevent text size adjustment on orientation change */
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  /* Prevent elastic bounce effect on iOS */
+  overscroll-behavior: none;
+  
+  /* Enable momentum scrolling on iOS */
+  -webkit-overflow-scrolling: touch;
+  
+  /* Prevent selection highlighting on tap */
+  -webkit-tap-highlight-color: transparent;
+  
+  /* Prevent callout on long-press for links/images */
+  -webkit-touch-callout: none;
+  
+  /* Safe area padding for full-bleed layouts */
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+}
+
+/* --------------------------------------------------------------------------
+   Safe Area Utility Classes
+   -------------------------------------------------------------------------- */
+
+/* Bottom padding that respects safe area (for fixed bottom elements) */
+.safe-bottom {
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+/* Extra bottom padding for elements above bottom nav */
+.pb-safe-bottom {
+  padding-bottom: calc(1.5rem + var(--safe-area-inset-bottom));
+}
+
+/* For fixed bottom navigation */
+.fixed-bottom-safe {
+  bottom: 0;
+  padding-bottom: var(--safe-area-inset-bottom);
+}
+
+/* Top safe area for elements that extend to top */
+.safe-top {
+  padding-top: var(--safe-area-inset-top);
+}
+
+/* --------------------------------------------------------------------------
+   Touch Optimization
+   -------------------------------------------------------------------------- */
+
+/* Prevent accidental zooming on double-tap for interactive elements */
+button,
+input,
+select,
+textarea,
+a {
+  touch-action: manipulation;
+}
+
+/* Larger touch targets for accessibility (44x44 minimum) */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* --------------------------------------------------------------------------
+   iOS-Specific Fixes
+   -------------------------------------------------------------------------- */
+
+/* Fix for 100vh on iOS Safari (address bar issues) */
+.h-screen-safe {
+  height: 100vh;
+  height: 100dvh; /* Dynamic viewport height - supported iOS 15.4+ */
+}
+
+.min-h-screen-safe {
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+/* Fix input zoom on iOS (font-size < 16px triggers zoom) */
+input[type="text"],
+input[type="email"],
+input[type="tel"],
+input[type="password"],
+input[type="number"],
+input[type="search"],
+textarea,
+select {
+  font-size: 16px;
+}
+
+/* Prevent iOS from styling inputs */
+input,
+textarea {
+  -webkit-appearance: none;
+  appearance: none;
+  border-radius: 0;
+}
+
+/* Fix for iOS date/time input styling */
+input[type="date"],
+input[type="time"],
+input[type="datetime-local"] {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+/* --------------------------------------------------------------------------
+   Scrolling Improvements
+   -------------------------------------------------------------------------- */
+
+/* Momentum scrolling for overflow containers */
+.scroll-smooth {
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+/* Hide scrollbar but keep scrollable (cross-browser) */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* --------------------------------------------------------------------------
+   PWA Standalone Mode Adjustments
+   -------------------------------------------------------------------------- */
+
+/* When running as installed PWA, adjust for missing browser chrome */
+@media all and (display-mode: standalone) {
+  /* Additional top padding when status bar is visible */
+  .pwa-header {
+    padding-top: calc(0.5rem + var(--safe-area-inset-top));
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Animation Performance
+   -------------------------------------------------------------------------- */
+
+/* GPU-accelerated animations */
+.gpu-accelerated {
+  transform: translateZ(0);
+  will-change: transform;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* --------------------------------------------------------------------------
+   Leaflet Map Fixes for Mobile
+   -------------------------------------------------------------------------- */
+
+/* Ensure map tiles render correctly */
+.leaflet-container {
+  touch-action: pan-x pan-y;
+  z-index: 0;
+}
+
+/* Fix for Leaflet controls on mobile */
+.leaflet-control-zoom {
+  touch-action: manipulation;
+}
+
+/* Better touch targets for zoom buttons */
+.leaflet-control-zoom a {
+  width: 36px !important;
+  height: 36px !important;
+  line-height: 36px !important;
+}
+
+/* --------------------------------------------------------------------------
+   Modal/Overlay Safe Areas
+   -------------------------------------------------------------------------- */
+
+/* Full-screen modals should respect all safe areas */
+.modal-fullscreen {
+  padding-top: var(--safe-area-inset-top);
+  padding-bottom: var(--safe-area-inset-bottom);
+  padding-left: var(--safe-area-inset-left);
+  padding-right: var(--safe-area-inset-right);
+}
+
+/* --------------------------------------------------------------------------
+   Status Bar Styles (iOS)
+   -------------------------------------------------------------------------- */
+
+/* When status bar content should be light (for dark backgrounds) */
+.status-bar-light {
+  /* This is handled by meta tag, but keeping for reference */
+}
+
+/* --------------------------------------------------------------------------
+   Loading States
+   -------------------------------------------------------------------------- */
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    #f3f4f6 25%,
+    #e5e7eb 50%,
+    #f3f4f6 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+

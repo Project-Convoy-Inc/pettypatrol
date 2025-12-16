@@ -19,8 +19,14 @@ export const INITIAL_BADGES: Badge[] = [
   { id: 'lane_leaper', name: 'Weaver', description: 'Caught a Lane Leaper.', unlocked: false, icon: '⚡', requiredBehaviorId: 'lane_leaper' },
   { id: 'honker', name: 'Silencer', description: 'Caught an Unhinged Honker.', unlocked: false, icon: '📢', requiredBehaviorId: 'unhinged_honker' },
   { id: 'zombie', name: 'Eye Opener', description: 'Caught a Texting Zombie.', unlocked: false, icon: '🧟', requiredBehaviorId: 'texting_zombie' },
+  { id: 'rager', name: 'Zen Master', description: 'Caught a Road Rager.', unlocked: false, icon: '🤬', requiredBehaviorId: 'road_rager' },
   { id: 'phantom', name: 'Ghostbuster', description: 'Caught a No-Signal Phantom.', unlocked: false, icon: '👻', requiredBehaviorId: 'no_signal_phantom' },
-  { id: 'legendary', name: 'LEGENDARY MIAMI DRIVER', description: 'Caught a driver doing EVERYTHING wrong.', unlocked: false, icon: '👑', requiredBehaviorId: undefined },
+  { id: 'skipper', name: 'Full Stop', description: 'Caught a Stop Sign Skipper.', unlocked: false, icon: '🛑', requiredBehaviorId: 'stop_sign_skipper' },
+  { id: 'menace', name: 'Space Saver', description: 'Caught a Parking Menace.', unlocked: false, icon: '🅿️', requiredBehaviorId: 'parking_menace' },
+  { id: 'demon', name: 'Speed Trap', description: 'Caught a Speed Demon.', unlocked: false, icon: '🏎️', requiredBehaviorId: 'speed_demon' },
+  { id: 'turtle', name: 'Pace Maker', description: 'Caught a Turtle Mode driver.', unlocked: false, icon: '🐢', requiredBehaviorId: 'turtle_mode' },
+  { id: 'blocker', name: 'Unblocker', description: 'Caught a Traffic Blocker.', unlocked: false, icon: '🧱', requiredBehaviorId: 'traffic_blocker' },
+  { id: 'legendary', name: 'Ultimate Miami Driver', description: 'Caught a driver doing EVERYTHING wrong.', unlocked: false, icon: '😱', requiredBehaviorId: undefined },
 ];
 
 export const INITIAL_DEALS: Deal[] = [
@@ -39,3 +45,7 @@ export const MOCK_HEAT_POINTS = Array.from({ length: 40 }, () => ({
   lng: MIAMI_LNG + (Math.random() - 0.5) * 0.04,
   intensity: Math.floor(Math.random() * 10) + 1,
 }));
+
+// Feature Flags
+// Show debug tools in development and staging, but not in production
+export const ENABLE_DEBUG_TOOLS = !import.meta.env.PROD;
