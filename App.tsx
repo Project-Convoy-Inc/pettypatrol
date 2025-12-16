@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ViewState, AnalysisResult, AnalysisType, Badge, Deal, LicensePlateReport } from './types';
-import { BEHAVIORS, INITIAL_BADGES, INITIAL_DEALS, ENABLE_DEBUG_TOOLS } from './constants';
+import { BEHAVIORS, INITIAL_BADGES, INITIAL_DEALS, ENABLE_DEBUG_TOOLS, STRIPE_PRICE_IDS } from './constants';
 import { analyzeImage } from './services/geminiService';
 import { trackView, trackEvent } from './services/posthog';
 import { saveReportToSupabase, saveBadgeToSupabase, saveDealClaimToSupabase } from './services/supabase';
 import { getAddressFromCoordinates } from './services/geocodingService';
+import { createCheckoutSession, verifyPayment } from './services/stripeService';
 import BottomNav from './components/BottomNav';
 import Button from './components/Button';
 import HeatMap from './components/HeatMap';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon } from 'lucide-react';
+import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon, Search, FileText, DollarSign, Lock, CheckCircle } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 // Google Maps types
@@ -377,6 +378,13 @@ const App: React.FC = () => {
   // Error state for user-friendly error messages
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   
+  // Payment state
+  const [checkReportPlateText, setCheckReportPlateText] = useState('');
+  const [paymentStatus, setPaymentStatus] = useState<{ paid: boolean; priceType: 'one-time' | 'yearly' | null } | null>(null);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [searchResultsPlate, setSearchResultsPlate] = useState('');
+  const [searchPlate, setSearchPlate] = useState('');
+  
   // Helper function to show error messages
   const showError = (message: string) => {
     setErrorMessage(message);
@@ -479,6 +487,89 @@ const App: React.FC = () => {
       badgesUnlocked: badges.filter(b => b.unlocked).length,
       totalPoints: reports.length * 50,
     });
+  }, [view]);
+
+  // Handle payment success from Stripe redirect
+  useEffect(() => {
+    if (view === ViewState.CHECK_REPORTS) {
+      const urlParams = new URLSearchParams(window.location.search);
+      const success = urlParams.get('success');
+      const sessionId = urlParams.get('session_id');
+      const canceled = urlParams.get('canceled');
+
+      if (canceled === 'true') {
+        showError('Payment was canceled. You can try again when ready.');
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+        return;
+      }
+
+      if (success === 'true' && sessionId) {
+        setIsProcessingPayment(true);
+        verifyPayment(sessionId)
+          .then((result) => {
+            if (result.paid) {
+              // Store payment status
+              const paymentData = {
+                paid: true,
+                priceType: result.priceType,
+                sessionId: result.sessionId,
+                timestamp: Date.now(),
+              };
+              localStorage.setItem('pettypatrol_payment', JSON.stringify(paymentData));
+              setPaymentStatus({ paid: true, priceType: result.priceType });
+              
+              // Track payment success
+              trackEvent('payment_success', {
+                priceType: result.priceType,
+                sessionId: result.sessionId,
+              });
+
+              // If license plate was provided, go to results
+              if (result.licensePlate) {
+                setSearchResultsPlate(result.licensePlate);
+                setView(ViewState.REPORT_RESULTS);
+              } else {
+                // Show success message and allow user to enter plate
+                showError('Payment successful! You can now check any license plate.');
+              }
+            } else {
+              showError('Payment verification failed. Please contact support.');
+            }
+            // Clean URL
+            window.history.replaceState({}, '', window.location.pathname);
+          })
+          .catch((error) => {
+            console.error('Payment verification error:', error);
+            showError('Failed to verify payment. Please contact support if you were charged.');
+            window.history.replaceState({}, '', window.location.pathname);
+          })
+          .finally(() => {
+            setIsProcessingPayment(false);
+          });
+      } else {
+        // Check if user already has payment
+        const savedPayment = localStorage.getItem('pettypatrol_payment');
+        if (savedPayment) {
+          try {
+            const paymentData = JSON.parse(savedPayment);
+            // Check if yearly payment is still valid (1 year from timestamp)
+            if (paymentData.priceType === 'yearly') {
+              const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
+              if (Date.now() - paymentData.timestamp < oneYearInMs) {
+                setPaymentStatus({ paid: true, priceType: 'yearly' });
+              } else {
+                localStorage.removeItem('pettypatrol_payment');
+              }
+            } else {
+              setPaymentStatus({ paid: true, priceType: 'one-time' });
+            }
+          } catch (e) {
+            console.error('Error parsing payment data:', e);
+          }
+        }
+      }
+    }
   }, [view]);
 
   const handleCaptureClick = () => {
@@ -1379,6 +1470,20 @@ const App: React.FC = () => {
                
                <HeatMap reports={reports} />
 
+               {/* CTA Button */}
+               <div className="mt-6">
+                 <button
+                   onClick={() => {
+                     setCheckReportPlateText('');
+                     setView(ViewState.CHECK_REPORTS);
+                   }}
+                   className="w-full bg-blue-600 hover:bg-blue-700 text-white font-display font-bold text-lg py-4 px-6 rounded-xl shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2"
+                 >
+                   <Search size={20} />
+                   Was my car reported?
+                 </button>
+               </div>
+
                <div className="mt-8">
                   <h3 className="text-sm font-bold text-zinc-900 mb-4 flex items-center gap-2">
                     <Zap size={16} className="text-red-600" />
@@ -1417,6 +1522,375 @@ const App: React.FC = () => {
                       })}
                   </div>
                </div>
+            </div>
+          </div>
+        );
+
+      case ViewState.CHECK_REPORTS:
+        const handlePaymentClick = async (priceId: string) => {
+          setIsProcessingPayment(true);
+          try {
+            trackEvent('payment_initiated', { priceType: priceId.includes('yearly') ? 'yearly' : 'one-time' });
+            const result = await createCheckoutSession(priceId, checkReportPlateText);
+            // Redirect to Stripe Checkout
+            if (result.url) {
+              window.location.href = result.url;
+            } else {
+              showError('Failed to create payment session. Please try again.');
+              setIsProcessingPayment(false);
+            }
+          } catch (error: any) {
+            console.error('Payment error:', error);
+            showError(error.message || 'Failed to start payment. Please try again.');
+            setIsProcessingPayment(false);
+          }
+        };
+
+        return (
+          <div className="min-h-screen bg-zinc-50 pb-24">
+            {/* Blue Header */}
+            <div 
+              className="bg-blue-600 pb-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-50"
+              style={{ paddingTop: 'calc(3rem + env(safe-area-inset-top, 0px))' }}
+            >
+              <h2 className="text-xl font-display font-bold text-white">Check Reports</h2>
+              <button 
+                onClick={() => setView(ViewState.LIVE)} 
+                className="text-white/90 hover:text-white hover:bg-blue-700/50 rounded-full p-2 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {isProcessingPayment ? (
+                <div className="flex flex-col items-center justify-center py-12">
+                  <div className="relative w-24 h-24 mb-8">
+                    <div className="absolute inset-0 border-4 border-zinc-100 rounded-full"></div>
+                    <div className="absolute inset-0 border-4 border-blue-600 rounded-full border-t-transparent animate-spin"></div>
+                  </div>
+                  <h3 className="text-xl font-bold text-zinc-800 animate-pulse">Processing payment...</h3>
+                  <p className="text-sm text-zinc-500 mt-2">Redirecting to secure checkout</p>
+                </div>
+              ) : paymentStatus?.paid ? (
+                <div className="bg-white rounded-2xl p-6 border border-green-200 shadow-sm mb-6">
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center">
+                      <CheckCircle size={24} className="text-green-600" />
+                    </div>
+                    <div>
+                      <h3 className="font-bold text-lg text-zinc-900">Payment Successful!</h3>
+                      <p className="text-sm text-zinc-500">
+                        {paymentStatus.priceType === 'yearly' ? 'Unlimited checks for 1 year' : 'One-time check access'}
+                      </p>
+                    </div>
+                  </div>
+                  <Button 
+                    fullWidth 
+                    onClick={() => {
+                      setSearchResultsPlate(checkReportPlateText || '');
+                      setView(ViewState.REPORT_RESULTS);
+                    }}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    Check License Plate
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="mb-6">
+                    <h2 className="text-2xl font-display font-bold text-zinc-900 mb-2">Check if Your Car Was Reported</h2>
+                    <p className="text-sm text-zinc-600">Find out if your license plate has been reported by other drivers</p>
+                  </div>
+
+                  {/* License Plate Input (Optional) */}
+                  <div className="mb-6">
+                    <label className="block text-sm font-bold text-zinc-900 mb-2">
+                      License Plate Number (Optional)
+                    </label>
+                    <input 
+                      type="text" 
+                      value={checkReportPlateText}
+                      onChange={(e) => {
+                        const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                        setCheckReportPlateText(sanitized);
+                      }}
+                      className="w-full text-2xl font-display font-black text-center border-2 border-zinc-200 rounded-xl focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none py-3 text-zinc-900 placeholder:text-zinc-300 transition-all"
+                      placeholder="ABC123"
+                    />
+                    <p className="text-xs text-zinc-500 mt-2 text-center">You can enter this now or after payment</p>
+                  </div>
+
+                  {/* Feature List */}
+                  <div className="bg-white rounded-2xl p-6 border border-zinc-100 shadow-sm mb-6">
+                    <h3 className="font-bold text-lg text-zinc-900 mb-4">What you'll get:</h3>
+                    <div className="space-y-3">
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <Search size={16} className="text-blue-600" />
+                        </div>
+                        <p className="text-sm text-zinc-700 flex-1">See if a license plate has been reported</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <FileText size={16} className="text-blue-600" />
+                        </div>
+                        <p className="text-sm text-zinc-700 flex-1">View detailed reports including behaviors</p>
+                      </div>
+                      <div className="flex items-start gap-3">
+                        <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
+                          <MapPin size={16} className="text-blue-600" />
+                        </div>
+                        <p className="text-sm text-zinc-700 flex-1">See where incidents occurred</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Pricing Options */}
+                  <div className="space-y-4 mb-6">
+                    {/* One-time Option */}
+                    <div className="bg-white rounded-2xl p-6 border-2 border-zinc-200 shadow-sm">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-xl text-zinc-900 mb-1">One-Time Check</h3>
+                          <p className="text-sm text-zinc-500">Check a single license plate</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-display font-black text-zinc-900">$5</div>
+                          <div className="text-xs text-zinc-500">one-time</div>
+                        </div>
+                      </div>
+                      <Button 
+                        fullWidth 
+                        onClick={() => handlePaymentClick(STRIPE_PRICE_IDS.ONE_TIME)}
+                        disabled={isProcessingPayment}
+                        className="bg-blue-600 hover:bg-blue-700"
+                      >
+                        <DollarSign size={18} className="inline mr-2" />
+                        Pay $5
+                      </Button>
+                    </div>
+
+                    {/* Yearly Option */}
+                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 border-2 border-blue-500 shadow-lg text-white relative overflow-hidden">
+                      <div className="absolute top-2 right-2 bg-yellow-400 text-blue-900 text-xs font-bold px-2 py-1 rounded-full">
+                        BEST VALUE
+                      </div>
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="font-bold text-xl mb-1">Unlimited Checks</h3>
+                          <p className="text-sm opacity-90">Check as many plates as you want for a full year</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-2xl font-display font-black">$14.99</div>
+                          <div className="text-xs opacity-90">per year</div>
+                        </div>
+                      </div>
+                      <Button 
+                        fullWidth 
+                        onClick={() => handlePaymentClick(STRIPE_PRICE_IDS.YEARLY)}
+                        disabled={isProcessingPayment}
+                        variant="secondary"
+                        className="bg-white text-blue-600 border-0 hover:bg-blue-50"
+                      >
+                        <Lock size={18} className="inline mr-2" />
+                        Pay $14.99/year
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="bg-zinc-100 rounded-xl p-4 text-center">
+                    <p className="text-xs text-zinc-600">
+                      <Lock size={12} className="inline mr-1" />
+                      Secure payment powered by Stripe
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        );
+
+      case ViewState.REPORT_RESULTS:
+        // Check if user has paid
+        const hasPaid = paymentStatus?.paid || (() => {
+          const savedPayment = localStorage.getItem('pettypatrol_payment');
+          if (savedPayment) {
+            try {
+              const paymentData = JSON.parse(savedPayment);
+              if (paymentData.priceType === 'yearly') {
+                const oneYearInMs = 365 * 24 * 60 * 60 * 1000;
+                return Date.now() - paymentData.timestamp < oneYearInMs;
+              }
+              return true;
+            } catch (e) {
+              return false;
+            }
+          }
+          return false;
+        })();
+
+        if (!hasPaid) {
+          // Redirect to paywall if not paid
+          return (
+            <div className="min-h-screen bg-zinc-50 pb-24">
+              <div className="bg-red-600 pb-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-50"
+                style={{ paddingTop: 'calc(3rem + env(safe-area-inset-top, 0px))' }}>
+                <h2 className="text-xl font-display font-bold text-white">Access Required</h2>
+                <button 
+                  onClick={() => setView(ViewState.CHECK_REPORTS)} 
+                  className="text-white/90 hover:text-white hover:bg-red-700/50 rounded-full p-2 transition-colors"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              <div className="p-6">
+                <div className="bg-white rounded-2xl p-8 text-center border border-zinc-200">
+                  <Lock size={48} className="text-zinc-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-bold text-zinc-900 mb-2">Payment Required</h3>
+                  <p className="text-zinc-600 mb-6">Please complete payment to access report results.</p>
+                  <Button onClick={() => setView(ViewState.CHECK_REPORTS)}>
+                    Go to Payment
+                  </Button>
+                </div>
+              </div>
+            </div>
+          );
+        }
+
+        const currentSearchPlate = searchPlate || searchResultsPlate;
+        const searchResults = reports.filter(r =>
+          r.plateText.toUpperCase() === currentSearchPlate.toUpperCase()
+        );
+
+        return (
+          <div className="min-h-screen bg-zinc-50 pb-24">
+            {/* Blue Header */}
+            <div 
+              className="bg-blue-600 pb-4 px-6 flex justify-between items-center shadow-md sticky top-0 z-50"
+              style={{ paddingTop: 'calc(3rem + env(safe-area-inset-top, 0px))' }}
+            >
+              <h2 className="text-xl font-display font-bold text-white">Report Results</h2>
+              <button 
+                onClick={() => {
+                  setSearchPlate('');
+                  setSearchResultsPlate('');
+                  setView(ViewState.CHECK_REPORTS);
+                }} 
+                className="text-white/90 hover:text-white hover:bg-blue-700/50 rounded-full p-2 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            <div className="p-6">
+              {/* Search Input */}
+              <div className="mb-6">
+                <label className="block text-sm font-bold text-zinc-900 mb-2">
+                  License Plate Number
+                </label>
+                <div className="flex gap-2">
+                  <input 
+                    type="text" 
+                    value={currentSearchPlate}
+                    onChange={(e) => {
+                      const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
+                      setSearchPlate(sanitized);
+                    }}
+                    className="flex-1 text-2xl font-display font-black text-center border-2 border-zinc-200 rounded-xl focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none py-3 text-zinc-900 placeholder:text-zinc-300 transition-all"
+                    placeholder="ABC123"
+                    autoFocus
+                  />
+                  <Button 
+                    onClick={() => {
+                      setSearchResultsPlate(searchPlate || currentSearchPlate);
+                    }}
+                    disabled={!currentSearchPlate.trim()}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    <Search size={20} />
+                  </Button>
+                </div>
+              </div>
+
+              {/* Results */}
+              {currentSearchPlate && (
+                <div>
+                  {searchResults.length === 0 ? (
+                    <div className="bg-white rounded-2xl p-8 text-center border border-zinc-200">
+                      <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
+                      <h3 className="text-xl font-bold text-zinc-900 mb-2">No Reports Found</h3>
+                      <p className="text-zinc-600">This license plate hasn't been reported yet.</p>
+                    </div>
+                  ) : (
+                    <>
+                      <div className="bg-blue-100 border border-blue-200 rounded-xl px-4 py-3 mb-4 flex items-center gap-3">
+                        <AlertCircle size={20} className="text-blue-700 shrink-0" />
+                        <p className="text-sm font-medium text-blue-800">
+                          Found <span className="font-bold">{searchResults.length} report{searchResults.length > 1 ? 's' : ''}</span> for {currentSearchPlate}
+                        </p>
+                      </div>
+
+                      <div className="space-y-4">
+                        {searchResults.map((report, index) => {
+                          const date = new Date(report.timestamp);
+                          const formattedDate = date.toLocaleDateString('en-US', { 
+                            month: 'short', 
+                            day: 'numeric', 
+                            year: 'numeric' 
+                          });
+                          const formattedTime = date.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          });
+                          
+                          return (
+                            <div key={report.id} className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+                              <div className="bg-zinc-100 px-4 py-2">
+                                <span className="text-xs font-bold text-zinc-500 uppercase tracking-wider">
+                                  Report #{searchResults.length - index}
+                                </span>
+                              </div>
+                              <div className="p-4 space-y-3">
+                                <div className="flex items-center gap-2 text-sm text-zinc-600">
+                                  <Calendar size={14} className="text-zinc-400" />
+                                  <span>{formattedDate} at {formattedTime}</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-sm text-zinc-600">
+                                  <MapPin size={14} className="text-zinc-400" />
+                                  <span>
+                                    {report.location || 'Unknown'}, FL {report.coordinates ? `${report.coordinates.lat.toFixed(2)}°N` : ''}
+                                  </span>
+                                </div>
+                                <div>
+                                  <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-2">Behaviors Caught:</p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {report.behaviors.map(behaviorId => {
+                                      const behavior = BEHAVIORS.find(b => b.id === behaviorId);
+                                      return behavior ? (
+                                        <span key={behaviorId} className="inline-flex items-center gap-1 bg-red-50 text-red-700 text-xs font-bold px-3 py-1.5 rounded-full border border-red-200">
+                                          {behavior.name}
+                                        </span>
+                                      ) : null;
+                                    })}
+                                  </div>
+                                </div>
+                                {report.customNote && (
+                                  <div className="pt-2 border-t border-zinc-100">
+                                    <p className="text-xs font-bold text-zinc-500 uppercase tracking-wider mb-1">Note:</p>
+                                    <p className="text-sm text-zinc-700">{report.customNote}</p>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         );
@@ -2014,6 +2488,8 @@ const App: React.FC = () => {
        view !== ViewState.LOCATION_PICKER &&
        view !== ViewState.PREVIOUS_REPORTS &&
        view !== ViewState.FEEDBACK &&
+       view !== ViewState.CHECK_REPORTS &&
+       view !== ViewState.REPORT_RESULTS &&
        !(view === ViewState.EDITOR && editingReport) && (
         <BottomNav currentView={view} onNavigate={setView} />
       )}

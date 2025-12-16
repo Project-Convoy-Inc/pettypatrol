@@ -49,3 +49,11 @@ export const MOCK_HEAT_POINTS = Array.from({ length: 40 }, () => ({
 // Feature Flags
 // Show debug tools in development and staging, but not in production
 export const ENABLE_DEBUG_TOOLS = !import.meta.env.PROD;
+
+// Stripe Price IDs
+// Replace these with your actual Stripe Price IDs from the Stripe Dashboard
+// Get them from: Products > [Your Product] > Pricing
+export const STRIPE_PRICE_IDS = {
+  ONE_TIME: import.meta.env.VITE_STRIPE_PRICE_ID_ONE_TIME || 'price_placeholder_onetime', // $5 one-time check
+  YEARLY: import.meta.env.VITE_STRIPE_PRICE_ID_YEARLY || 'price_placeholder_yearly', // $14.99 yearly unlimited
+};
