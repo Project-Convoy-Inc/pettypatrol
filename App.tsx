@@ -3,6 +3,7 @@ import { ViewState, AnalysisResult, AnalysisType, Badge, Deal, LicensePlateRepor
 import { BEHAVIORS, INITIAL_BADGES, INITIAL_DEALS, ENABLE_DEBUG_TOOLS } from './constants';
 import { analyzeImage } from './services/geminiService';
 import { trackView, trackEvent } from './services/posthog';
+import { saveReportToSupabase, saveBadgeToSupabase, saveDealClaimToSupabase } from './services/supabase';
 import BottomNav from './components/BottomNav';
 import Button from './components/Button';
 import HeatMap from './components/HeatMap';
@@ -147,7 +148,7 @@ const Header: React.FC = () => (
   </header>
 );
 
-const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
+const Onboarding: React.FC<{ onComplete: () => void; onShowAuthInfo: () => void }> = ({ onComplete, onShowAuthInfo }) => (
   <div 
     className="min-h-screen bg-red-600 text-white p-8 flex flex-col justify-center items-center text-center"
     style={{ 
@@ -183,6 +184,64 @@ const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
     <Button onClick={onComplete} variant="secondary" size="lg" fullWidth>
       Let's Roll
     </Button>
+    <button
+      onClick={onShowAuthInfo}
+      className="mt-4 text-sm text-white/80 underline underline-offset-2 hover:text-white transition-colors"
+    >
+      Why don't I have to authenticate?
+    </button>
+  </div>
+);
+
+// Auth Info Modal Component
+const AuthInfoModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
+  <div 
+    className="fixed inset-0 bg-black/50 flex items-center justify-center p-8 z-50 animate-in fade-in duration-300"
+    onClick={onClose}
+  >
+    <div 
+      className="bg-white p-8 rounded-3xl shadow-xl max-w-sm w-full animate-in zoom-in duration-300"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6 text-blue-600">
+        <AlertCircle size={40} />
+      </div>
+      
+      <h2 className="text-2xl font-display font-black text-zinc-900 italic mb-4 text-center">
+        Beta Testing Mode
+      </h2>
+      
+      <p className="text-zinc-600 font-medium mb-6 text-center">
+        Right now, we're just collecting usage information to improve the app. We're not creating user accounts yet—that's coming soon!
+      </p>
+
+      <div className="space-y-4 mb-6 text-sm text-zinc-700">
+        <div className="flex gap-3">
+          <div className="shrink-0 w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-bold text-zinc-600">1</div>
+          <p>
+            <strong className="font-bold">Your data stays on this device:</strong> Each phone or browser you use is treated as a separate user. Your reports, badges, and deals won't sync between devices.
+          </p>
+        </div>
+        
+        <div className="flex gap-3">
+          <div className="shrink-0 w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-bold text-zinc-600">2</div>
+          <p>
+            <strong className="font-bold">Watch out for data loss:</strong> If you clear your browser data or uninstall the app, all your progress will be gone. We can't recover it right now.
+          </p>
+        </div>
+        
+        <div className="flex gap-3">
+          <div className="shrink-0 w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center text-xs font-bold text-zinc-600">3</div>
+          <p>
+            <strong className="font-bold">No account recovery:</strong> If you lose your phone or switch devices, there's no way to get your data back. Everything is stored locally on your device.
+          </p>
+        </div>
+      </div>
+
+      <Button fullWidth onClick={onClose}>
+        Got it
+      </Button>
+    </div>
   </div>
 );
 
@@ -222,6 +281,9 @@ const App: React.FC = () => {
   
   // 500 points notice state
   const [show500PointsNotice, setShow500PointsNotice] = useState(false);
+  
+  // Auth info modal state
+  const [showAuthInfoModal, setShowAuthInfoModal] = useState(false);
   
   // Error state for user-friendly error messages
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -440,6 +502,10 @@ const App: React.FC = () => {
       }
       const updatedDeals = deals.map(d => d.id === matchedDeal.id ? { ...d, claimed: true } : d);
       setDeals(updatedDeals);
+      
+      // Save to Supabase
+      saveDealClaimToSupabase(matchedDeal);
+      
       setAnalysisResult({ type: AnalysisType.QR_CODE, value: matchedDeal.partnerName, confidence: 1 });
       
       // Track successful deal claim
@@ -513,6 +579,9 @@ const App: React.FC = () => {
     
     setReports([newReport, ...reports]);
     
+    // Save to Supabase
+    saveReportToSupabase(newReport);
+    
     // Track report submission
     trackEvent('report_submitted', {
       behaviorsCount: selectedBehaviors.length,
@@ -554,12 +623,14 @@ const App: React.FC = () => {
       setBadges(updatedBadges);
       // Track each badge unlock
       unlockedBadgeIds.forEach(badgeId => {
-        const badge = badges.find(b => b.id === badgeId);
+        const badge = updatedBadges.find(b => b.id === badgeId);
         if (badge) {
           trackEvent('badge_unlocked', { 
             badgeId: badge.id, 
             badgeName: badge.name 
           });
+          // Save to Supabase
+          saveBadgeToSupabase(badge);
         }
       });
     }
@@ -614,10 +685,13 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (view) {
       case ViewState.ONBOARDING:
-        return <Onboarding onComplete={() => {
-          trackEvent('onboarding_completed');
-          setView(ViewState.HOME);
-        }} />;
+        return <Onboarding 
+          onComplete={() => {
+            trackEvent('onboarding_completed');
+            setView(ViewState.HOME);
+          }}
+          onShowAuthInfo={() => setShowAuthInfoModal(true)}
+        />;
       
       case ViewState.HOME:
         return (
@@ -1814,6 +1888,11 @@ const App: React.FC = () => {
         message={errorMessage} 
         onClose={() => setErrorMessage(null)} 
       />
+      
+      {/* Auth Info Modal */}
+      {showAuthInfoModal && (
+        <AuthInfoModal onClose={() => setShowAuthInfoModal(false)} />
+      )}
       
       {/* Hide Bottom Nav on Onboarding, Capture Process, Feedback, and Editor Edit Mode */}
       {view !== ViewState.ONBOARDING && 

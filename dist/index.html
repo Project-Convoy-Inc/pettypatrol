@@ -30,8 +30,15 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/icons/favicon-32.png" />
     <link rel="icon" type="image/png" sizes="16x16" href="/icons/favicon-16.png" />
     
+    <!-- Additional Favicon Links (for broader browser compatibility) -->
+    <link rel="icon" type="image/png" href="/favicon-96x96.png" sizes="96x96" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    
     <!-- PWA Manifest -->
-    <link rel="manifest" href="/assets/manifest-CkC6yV_8.json" />
+    <link rel="manifest" href="/manifest.json" />
     
     <!-- Preconnect to external resources for faster loading -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -109,8 +116,8 @@
   }
 }
     </script>
-    <script type="module" crossorigin src="/assets/index-gaySqAZN.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-fu4v7VBk.css">
+    <script type="module" crossorigin src="/assets/main-B0i4hHOO.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/main-CwEfLT_E.css">
   </head>
   <body>
     <div id="root"></div>
@@ -118,16 +125,24 @@
     <!-- Service Worker Registration -->
     <script>
       if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
+        // Register when DOM is ready (earlier than window.load for better reliability)
+        const registerSW = () => {
+          navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then(registration => {
-              console.log('SW registered:', registration.scope);
+              console.log('[PWA] Service worker registered:', registration.scope);
             })
             .catch(error => {
-              console.log('SW registration failed:', error);
+              console.error('[PWA] Service worker registration failed:', error);
             });
-        });
+        };
+        
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', registerSW);
+        } else {
+          registerSW();
+        }
       }
+      
     </script>
   </body>
 </html>

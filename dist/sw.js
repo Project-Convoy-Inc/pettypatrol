@@ -9,10 +9,10 @@ const CACHE_NAME = 'petty-patrol-v1';
 const RUNTIME_CACHE = 'petty-patrol-runtime-v1';
 
 // Assets to cache on install (app shell)
+// Note: CSS files are bundled by Vite, so we don't precache /index.css directly
 const PRECACHE_ASSETS = [
   '/',
   '/index.html',
-  '/index.css',
   '/manifest.json',
   // Icons
   '/icons/icon-192.png',
