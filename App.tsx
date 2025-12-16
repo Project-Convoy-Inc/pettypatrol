@@ -10,7 +10,7 @@ import BottomNav from './components/BottomNav';
 import Button from './components/Button';
 import HeatMap from './components/HeatMap';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon, Search, FileText, DollarSign, Lock, CheckCircle } from 'lucide-react';
+import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon, Search, FileText, DollarSign, Lock, CheckCircle, Sparkles } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 // Google Maps types
@@ -1600,25 +1600,7 @@ const App: React.FC = () => {
                 <>
                   <div className="mb-6">
                     <h2 className="text-2xl font-display font-bold text-zinc-900 mb-2">Check if Your Car Was Reported</h2>
-                    <p className="text-sm text-zinc-600">Find out if your license plate has been reported by other drivers</p>
-                  </div>
-
-                  {/* License Plate Input (Optional) */}
-                  <div className="mb-6">
-                    <label className="block text-sm font-bold text-zinc-900 mb-2">
-                      License Plate Number (Optional)
-                    </label>
-                    <input 
-                      type="text" 
-                      value={checkReportPlateText}
-                      onChange={(e) => {
-                        const sanitized = e.target.value.replace(/[^a-zA-Z0-9]/g, '').toUpperCase();
-                        setCheckReportPlateText(sanitized);
-                      }}
-                      className="w-full text-2xl font-display font-black text-center border-2 border-zinc-200 rounded-xl focus:border-blue-600 focus:ring-4 focus:ring-blue-50 outline-none py-3 text-zinc-900 placeholder:text-zinc-300 transition-all"
-                      placeholder="ABC123"
-                    />
-                    <p className="text-xs text-zinc-500 mt-2 text-center">You can enter this now or after payment</p>
+                    <p className="text-sm text-zinc-600">Find out if your license plate has been reported by other drivers.</p>
                   </div>
 
                   {/* Feature List */}
@@ -1662,17 +1644,15 @@ const App: React.FC = () => {
                       </div>
                       <Button 
                         fullWidth 
-                        onClick={() => handlePaymentClick(STRIPE_PRICE_IDS.ONE_TIME)}
-                        disabled={isProcessingPayment}
-                        className="bg-blue-600 hover:bg-blue-700"
+                        onClick={() => showError('Individual reports coming soon!')}
+                        className="bg-blue-600 hover:bg-green-600"
                       >
-                        <DollarSign size={18} className="inline mr-2" />
-                        Pay $5
+                        See My Report
                       </Button>
                     </div>
 
                     {/* Yearly Option */}
-                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl p-6 border-2 border-blue-500 shadow-lg text-white relative overflow-hidden">
+                    <div className="bg-gradient-to-br from-blue-600 to-blue-700 rounded-2xl pt-10 px-6 pb-6 border-2 border-blue-500 shadow-lg text-white relative overflow-hidden">
                       <div className="absolute top-2 right-2 bg-yellow-400 text-blue-900 text-xs font-bold px-2 py-1 rounded-full">
                         BEST VALUE
                       </div>
@@ -1688,13 +1668,12 @@ const App: React.FC = () => {
                       </div>
                       <Button 
                         fullWidth 
-                        onClick={() => handlePaymentClick(STRIPE_PRICE_IDS.YEARLY)}
-                        disabled={isProcessingPayment}
+                        onClick={() => showError('Individual reports coming soon!')}
                         variant="secondary"
-                        className="bg-white text-blue-600 border-0 hover:bg-blue-50"
+                        className="bg-white text-blue-600 border-0 hover:bg-green-500 hover:text-white shadow-[0_0_15px_rgba(34,197,94,0.4)]"
                       >
-                        <Lock size={18} className="inline mr-2" />
-                        Pay $14.99/year
+                        <Sparkles size={18} className="inline mr-2" />
+                        Get Unlimited for $14.99
                       </Button>
                     </div>
                   </div>
@@ -1820,7 +1799,13 @@ const App: React.FC = () => {
                     <div className="bg-white rounded-2xl p-8 text-center border border-zinc-200">
                       <CheckCircle size={48} className="text-green-500 mx-auto mb-4" />
                       <h3 className="text-xl font-bold text-zinc-900 mb-2">No Reports Found</h3>
-                      <p className="text-zinc-600">This license plate hasn't been reported yet.</p>
+                      <p className="text-zinc-600 mb-4">This license plate hasn't been reported yet.</p>
+                      {/* Coupon code for courtesy free check */}
+                      <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <p className="text-xs text-green-700">
+                          <span className="font-bold">Good news!</span> Use code <span className="font-mono font-bold bg-green-100 px-1 rounded">COURTESYPAYS</span> at checkout for a free future check!
+                        </p>
+                      </div>
                     </div>
                   ) : (
                     <>
