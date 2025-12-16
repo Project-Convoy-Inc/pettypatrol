@@ -4,13 +4,60 @@ import { BEHAVIORS, INITIAL_BADGES, INITIAL_DEALS, ENABLE_DEBUG_TOOLS } from './
 import { analyzeImage } from './services/geminiService';
 import { trackView, trackEvent } from './services/posthog';
 import { saveReportToSupabase, saveBadgeToSupabase, saveDealClaimToSupabase } from './services/supabase';
+import { getAddressFromCoordinates } from './services/geocodingService';
 import BottomNav from './components/BottomNav';
 import Button from './components/Button';
 import HeatMap from './components/HeatMap';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import L from 'leaflet';
+
+// Google Maps types
+declare global {
+  interface Window {
+    google: {
+      maps: {
+        Map: new (element: HTMLElement, options?: any) => google.maps.Map;
+        Marker: new (options?: any) => google.maps.Marker;
+        MapMouseEvent: {
+          latLng: google.maps.LatLng | null;
+        };
+        LatLng: new (lat: number, lng: number) => google.maps.LatLng;
+        SymbolPath: {
+          CIRCLE: string;
+        };
+        Animation: {
+          DROP: number;
+        };
+      };
+    };
+  }
+  
+  namespace google {
+    namespace maps {
+      interface Map {
+        setCenter(latlng: LatLngLiteral): void;
+        setZoom(zoom: number): void;
+        addListener(event: string, handler: (e: MapMouseEvent) => void): void;
+      }
+      interface Marker {
+        setPosition(latlng: LatLngLiteral): void;
+        setMap(map: Map | null): void;
+      }
+      interface MapMouseEvent {
+        latLng: LatLng | null;
+      }
+      interface LatLng {
+        lat(): number;
+        lng(): number;
+      }
+      interface LatLngLiteral {
+        lat: number;
+        lng: number;
+      }
+    }
+  }
+}
 
 // --- Error Toast Component ---
 interface ErrorToastProps {
@@ -38,95 +85,137 @@ const ErrorToast: React.FC<ErrorToastProps> = ({ message, onClose }) => {
   );
 };
 
-// --- Helper: Leaflet Picker Component ---
+// --- Helper: Google Maps Picker Component ---
 
-interface LeafletPickerProps {
+interface GoogleMapsPickerProps {
     onLocationSelect: (lat: number, lng: number) => void;
     initialLat?: number;
     initialLng?: number;
 }
 
-const LeafletPicker: React.FC<LeafletPickerProps> = ({ onLocationSelect, initialLat, initialLng }) => {
+const GoogleMapsPicker: React.FC<GoogleMapsPickerProps> = ({ onLocationSelect, initialLat, initialLng }) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
-    const mapRef = useRef<L.Map | null>(null);
-    const markerRef = useRef<L.Marker | null>(null);
+    const mapRef = useRef<any>(null);
+    const markerRef = useRef<any>(null);
+    const [mapsLoaded, setMapsLoaded] = useState(false);
     
     // Miami Center default
     const DEFAULT_LAT = 25.774;
     const DEFAULT_LNG = -80.133;
 
+    // Load Google Maps script
     useEffect(() => {
-        if (!mapContainerRef.current) return;
-
-        if (!mapRef.current) {
-            mapRef.current = L.map(mapContainerRef.current, {
-                center: [initialLat || DEFAULT_LAT, initialLng || DEFAULT_LNG],
-                zoom: 15,
-                zoomControl: true,
-                attributionControl: false
-            });
-
-            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                maxZoom: 19,
-            }).addTo(mapRef.current);
-
-            // Custom Icon
-            const icon = L.divIcon({
-                className: 'bg-transparent',
-                html: `<div class="w-8 h-8 bg-red-600 rounded-full border-4 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2"></div>`,
-                iconSize: [0, 0]
-            });
-
-            // Click handler
-            mapRef.current.on('click', (e) => {
-                const { lat, lng } = e.latlng;
-                
-                if (markerRef.current) {
-                    markerRef.current.setLatLng([lat, lng]);
-                } else {
-                    markerRef.current = L.marker([lat, lng], { icon }).addTo(mapRef.current!);
-                }
-                
-                onLocationSelect(lat, lng);
-            });
+        if (window.google?.maps) {
+            setMapsLoaded(true);
+            return;
         }
 
-        // If initial coords provided, set marker
-        if (initialLat && initialLng && mapRef.current) {
-             const icon = L.divIcon({
-                className: 'bg-transparent',
-                html: `<div class="w-8 h-8 bg-red-600 rounded-full border-4 border-white shadow-lg transform -translate-x-1/2 -translate-y-1/2"></div>`,
-                iconSize: [0, 0]
-            });
-            if (!markerRef.current) {
-                markerRef.current = L.marker([initialLat, initialLng], { icon }).addTo(mapRef.current);
-            } else {
-                markerRef.current.setLatLng([initialLat, initialLng]);
-            }
-            mapRef.current.setView([initialLat, initialLng], 15);
-        }
+        const script = document.createElement('script');
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${import.meta.env.VITE_GOOGLE_MAPS_API_KEY || ''}&libraries=places`;
+        script.async = true;
+        script.defer = true;
+        script.onload = () => {
+            setMapsLoaded(true);
+        };
+        script.onerror = () => {
+            console.error('Failed to load Google Maps');
+        };
+        document.head.appendChild(script);
 
-        // Fix tiles on resize - try multiple times with increasing delays
-        [100, 300, 500].forEach((delay) => {
-            setTimeout(() => {
-                mapRef.current?.invalidateSize();
-            }, delay);
-        });
-
-    }, []);
-
-    // Cleanup on unmount
-    useEffect(() => {
         return () => {
-            if (mapRef.current) {
-                mapRef.current.remove();
-                mapRef.current = null;
-                markerRef.current = null;
+            // Cleanup script if component unmounts before load
+            if (script.parentNode) {
+                script.parentNode.removeChild(script);
             }
         };
     }, []);
 
-    return <div ref={mapContainerRef} className="w-full h-full bg-zinc-100" />;
+    // Initialize map when Google Maps is loaded
+    useEffect(() => {
+        if (!mapsLoaded || !mapContainerRef.current || mapRef.current || !window.google?.maps) return;
+
+        const center = { lat: initialLat || DEFAULT_LAT, lng: initialLng || DEFAULT_LNG };
+
+        // Initialize map
+        mapRef.current = new window.google.maps.Map(mapContainerRef.current, {
+            center,
+            zoom: 15,
+            zoomControl: true,
+            mapTypeControl: false,
+            streetViewControl: false,
+            fullscreenControl: false,
+            styles: [
+                {
+                    featureType: 'poi',
+                    elementType: 'labels',
+                    stylers: [{ visibility: 'off' }]
+                }
+            ]
+        });
+
+        // Custom marker icon (red circle)
+        const markerIcon = {
+            path: window.google.maps.SymbolPath.CIRCLE,
+            scale: 8,
+            fillColor: '#dc2626',
+            fillOpacity: 1,
+            strokeColor: '#ffffff',
+            strokeWeight: 4,
+        };
+
+        // Click handler
+        mapRef.current.addListener('click', (e: any) => {
+            if (!e.latLng) return;
+            
+            const lat = e.latLng.lat();
+            const lng = e.latLng.lng();
+            
+            // #region agent log
+            fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:82',message:'Map clicked - coordinates captured',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+            // #endregion
+            
+            if (markerRef.current) {
+                markerRef.current.setPosition({ lat, lng });
+            } else {
+                markerRef.current = new window.google.maps.Marker({
+                    position: { lat, lng },
+                    map: mapRef.current,
+                    icon: markerIcon,
+                    animation: window.google.maps.Animation.DROP
+                });
+            }
+            
+            onLocationSelect(lat, lng);
+        });
+
+        // Set initial marker if coordinates provided
+        if (initialLat && initialLng) {
+            markerRef.current = new window.google.maps.Marker({
+                position: { lat: initialLat, lng: initialLng },
+                map: mapRef.current,
+                icon: markerIcon
+            });
+            mapRef.current.setCenter({ lat: initialLat, lng: initialLng });
+        }
+    }, [mapsLoaded, initialLat, initialLng, onLocationSelect]);
+
+    // Update marker position when initial coords change
+    useEffect(() => {
+        if (!mapRef.current || !markerRef.current || !initialLat || !initialLng) return;
+        
+        markerRef.current.setPosition({ lat: initialLat, lng: initialLng });
+        mapRef.current.setCenter({ lat: initialLat, lng: initialLng });
+    }, [initialLat, initialLng]);
+
+    if (!mapsLoaded) {
+        return (
+            <div className="w-full h-full bg-zinc-100 flex items-center justify-center">
+                <div className="text-zinc-400 text-sm">Loading map...</div>
+            </div>
+        );
+    }
+
+    return <div ref={mapContainerRef} className="w-full h-full bg-zinc-100 google-map-container" />;
 };
 
 
@@ -443,7 +532,7 @@ const App: React.FC = () => {
     if (isFromCamera) {
       autoLocation = await captureCurrentLocation();
       if (autoLocation) {
-        const address = getAddressFromCoords(autoLocation.lat, autoLocation.lng);
+        const address = await getAddressFromCoords(autoLocation.lat, autoLocation.lng);
         setSelectedLocation({ ...autoLocation, address });
       }
     }
@@ -523,30 +612,38 @@ const App: React.FC = () => {
     }
   };
 
-  const getAddressFromCoords = (lat: number, lng: number) => {
-    // A simplified reverse geocoder for Miami grid
-    // Miami Avenues run N/S, Streets run E/W
-    // This is purely for flavor in the prototype
+  const getAddressFromCoords = async (lat: number, lng: number): Promise<string> => {
+    // Use Google Maps Geocoding API for accurate reverse geocoding
+    // #region agent log
+    fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:526',message:'getAddressFromCoords INPUT - calling Google Maps API',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
     
-    const latBase = 25.774;
-    const lngBase = -80.133;
-    
-    const latDiff = (lat - latBase) * 1000; // Roughly blocks
-    const lngDiff = (lng - lngBase) * 1000;
-
-    const streetNum = Math.abs(Math.floor(10 + latDiff));
-    const isSt = Math.random() > 0.3; // mostly streets
-    
-    const avenues = ['Ocean Dr', 'Collins Ave', 'Washington Ave', 'Alton Rd', 'Meridian Ave', 'Jefferson Ave'];
-    const aveIndex = Math.abs(Math.floor(lngDiff)) % avenues.length;
-    
-    const address = `${streetNum}${streetNum % 10 === 1 ? 'st' : streetNum % 10 === 2 ? 'nd' : 'th'} St & ${avenues[aveIndex]}`;
-    
-    return address;
+    try {
+      const address = await getAddressFromCoordinates(lat, lng);
+      
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:532',message:'Final address OUTPUT from Google Maps',data:{address,lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      return address;
+    } catch (error) {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:537',message:'Geocoding error',data:{error:error instanceof Error ? error.message : String(error),lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      
+      // Fallback to coordinates if geocoding fails
+      return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+    }
   };
 
-  const handleLocationSelect = (lat: number, lng: number) => {
-      const address = getAddressFromCoords(lat, lng);
+  const handleLocationSelect = async (lat: number, lng: number) => {
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:546',message:'handleLocationSelect called',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
+      const address = await getAddressFromCoords(lat, lng);
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:548',message:'Setting selected location',data:{lat,lng,address},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       setSelectedLocation({ lat, lng, address });
   };
 
@@ -669,7 +766,7 @@ const App: React.FC = () => {
         </div>
         
         <div className="w-full h-48 rounded-xl relative overflow-hidden border border-zinc-200">
-            <LeafletPicker 
+            <GoogleMapsPicker 
                 onLocationSelect={handleLocationSelect} 
                 initialLat={selectedLocation?.lat}
                 initialLng={selectedLocation?.lng}
@@ -873,8 +970,11 @@ const App: React.FC = () => {
                 {/* Full-height Map - explicit height calculation */}
                 <div className="flex-1 relative min-h-0">
                     <div className="absolute inset-0">
-                        <LeafletPicker 
+                        <GoogleMapsPicker 
                             onLocationSelect={(lat, lng) => {
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:875',message:'Location picker - temp location set',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
+                                // #endregion
                                 setTempLocation({ lat, lng });
                             }} 
                             initialLat={tempLocation?.lat || selectedLocation?.lat}
@@ -894,9 +994,15 @@ const App: React.FC = () => {
                     <Button 
                         fullWidth 
                         size="lg"
-                        onClick={() => {
+                        onClick={async () => {
                             if (tempLocation) {
-                                const address = getAddressFromCoords(tempLocation.lat, tempLocation.lng);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:896',message:'Confirm button clicked',data:{tempLocation},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+                                // #endregion
+                                const address = await getAddressFromCoords(tempLocation.lat, tempLocation.lng);
+                                // #region agent log
+                                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:898',message:'Location confirmed and set',data:{tempLocation,address},timestamp:Date.now(),sessionId:'debug-session',runId:'post-fix',hypothesisId:'A'})}).catch(()=>{});
+                                // #endregion
                                 setSelectedLocation({ ...tempLocation, address });
                             }
                             setView(locationPickerReturnView);
@@ -1737,9 +1843,9 @@ const App: React.FC = () => {
                   </div>
                   
                   <div className="w-full h-48 rounded-xl relative overflow-hidden border border-zinc-200">
-                    <LeafletPicker 
-                      onLocationSelect={(lat, lng) => {
-                        const address = getAddressFromCoords(lat, lng);
+                    <GoogleMapsPicker 
+                      onLocationSelect={async (lat, lng) => {
+                        const address = await getAddressFromCoords(lat, lng);
                         setEditLocation({ lat, lng, address });
                       }} 
                       initialLat={editLocation?.lat}
@@ -1816,8 +1922,11 @@ const App: React.FC = () => {
           <div className="min-h-screen bg-zinc-50 pb-24">
             <Header />
             <div className="p-6">
-              <div className="flex justify-between items-end mb-6">
-                <h2 className="text-2xl font-display font-bold text-zinc-900">My Reports</h2>
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-2xl font-display font-bold text-zinc-900">My PettyDex reports</h2>
+                  <p className="text-sm text-zinc-600 mt-1">This is your rolodex of bad drivers you've caught</p>
+                </div>
                 <span className="text-xs font-bold bg-zinc-200 px-2 py-1 rounded text-zinc-600">
                   {reports.length} Total
                 </span>
