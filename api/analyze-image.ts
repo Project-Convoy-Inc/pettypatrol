@@ -42,25 +42,18 @@ export default async function handler(
     return res.status(500).json({ error: 'API key not configured' });
   }
 
-  const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent';
+  const GEMINI_API_URL = 'https://generativelanguage.googleapis.com/v1/models/gemini-2.5-flash:generateContent';
 
   try {
     // Add timeout to prevent hanging requests (30 seconds)
     const controller = new AbortController();
     const timeoutId = setTimeout(() => controller.abort(), 30000);
 
-    const response = await fetch(
-      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        signal: controller.signal,
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Analyze this image and determine:
+    const requestBody = {
+      contents: [{
+        parts: [
+          {
+            text: `Analyze this image and determine:
 1. If there's a license plate visible, extract the plate text (letters and numbers only, uppercase, no spaces or special characters)
 2. If there's a QR code visible, extract the QR code content
 3. If neither is clearly visible, respond with "INVALID"
@@ -70,12 +63,27 @@ Respond in JSON format:
   "type": "LICENSE_PLATE" | "QR_CODE" | "INVALID",
   "value": "extracted text or QR content",
   "confidence": 0.0-1.0
-}
+}`
+          },
+          {
+            inlineData: {
+              mimeType: mimeType,
+              data: base64Content
+            }
+          }
+        ]
+      }]
+    };
 
-Image data: data:${mimeType};base64,${base64Content}`
-            }]
-          }]
-        }),
+    const response = await fetch(
+      `${GEMINI_API_URL}?key=${GEMINI_API_KEY}`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        signal: controller.signal,
+        body: JSON.stringify(requestBody),
       }
     );
 

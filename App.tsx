@@ -81,10 +81,6 @@ const LeafletPicker: React.FC<LeafletPickerProps> = ({ onLocationSelect, initial
             mapRef.current.on('click', (e) => {
                 const { lat, lng } = e.latlng;
                 
-                // #region agent log
-                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:82',message:'Map clicked',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                // #endregion
-                
                 if (markerRef.current) {
                     markerRef.current.setLatLng([lat, lng]);
                 } else {
@@ -532,19 +528,11 @@ const App: React.FC = () => {
     // Miami Avenues run N/S, Streets run E/W
     // This is purely for flavor in the prototype
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:526',message:'getAddressFromCoords called',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     const latBase = 25.774;
     const lngBase = -80.133;
     
     const latDiff = (lat - latBase) * 1000; // Roughly blocks
     const lngDiff = (lng - lngBase) * 1000;
-
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:535',message:'Calculated differences',data:{latBase,lngBase,latDiff,lngDiff},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-    // #endregion
 
     const streetNum = Math.abs(Math.floor(10 + latDiff));
     const isSt = Math.random() > 0.3; // mostly streets
@@ -552,27 +540,13 @@ const App: React.FC = () => {
     const avenues = ['Ocean Dr', 'Collins Ave', 'Washington Ave', 'Alton Rd', 'Meridian Ave', 'Jefferson Ave'];
     const aveIndex = Math.abs(Math.floor(lngDiff)) % avenues.length;
     
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:541',message:'Before Math.abs on lngDiff',data:{lngDiff,floorLngDiff:Math.floor(lngDiff),absFloorLngDiff:Math.abs(Math.floor(lngDiff)),aveIndex},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
-    
     const address = `${streetNum}${streetNum % 10 === 1 ? 'st' : streetNum % 10 === 2 ? 'nd' : 'th'} St & ${avenues[aveIndex]}`;
-    
-    // #region agent log
-    fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:544',message:'Final address result',data:{streetNum,aveIndex,avenue:avenues[aveIndex],address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     
     return address;
   };
 
   const handleLocationSelect = (lat: number, lng: number) => {
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:546',message:'handleLocationSelect called',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       const address = getAddressFromCoords(lat, lng);
-      // #region agent log
-      fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:548',message:'Setting selected location',data:{lat,lng,address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
       setSelectedLocation({ lat, lng, address });
   };
 
@@ -901,9 +875,6 @@ const App: React.FC = () => {
                     <div className="absolute inset-0">
                         <LeafletPicker 
                             onLocationSelect={(lat, lng) => {
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:875',message:'Location picker onLocationSelect',data:{lat,lng},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                                // #endregion
                                 setTempLocation({ lat, lng });
                             }} 
                             initialLat={tempLocation?.lat || selectedLocation?.lat}
@@ -925,13 +896,7 @@ const App: React.FC = () => {
                         size="lg"
                         onClick={() => {
                             if (tempLocation) {
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:896',message:'Confirm location clicked',data:{tempLocation},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                                // #endregion
                                 const address = getAddressFromCoords(tempLocation.lat, tempLocation.lng);
-                                // #region agent log
-                                fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'App.tsx:898',message:'Setting location from picker',data:{tempLocation,address},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-                                // #endregion
                                 setSelectedLocation({ ...tempLocation, address });
                             }
                             setView(locationPickerReturnView);
