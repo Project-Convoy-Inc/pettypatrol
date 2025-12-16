@@ -158,7 +158,7 @@ const Onboarding: React.FC<{ onComplete: () => void }> = ({ onComplete }) => (
   >
     <div className="mb-8 p-4 bg-white rounded-full shadow-xl flex items-center justify-center">
       <img 
-        src="/mascot.png" 
+        src="https://raw.githubusercontent.com/Project-Convoy-Inc/pettypatrol/main/mascot.png" 
         alt="Petty Patrol Mascot" 
         className="w-32 h-32 object-contain" 
       />
