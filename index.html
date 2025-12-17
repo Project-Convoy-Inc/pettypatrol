@@ -127,64 +127,15 @@
     
     <!-- Service Worker Registration -->
     <script>
-      // #region agent log
-      // Debug: Check manifest accessibility
-      (async function debugPWA() {
-        const log = (msg, data) => fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:debug',message:msg,data:data,timestamp:Date.now(),sessionId:'debug-session',hypothesisId:data.hypothesis})}).catch(()=>{});
-        
-        // Hypothesis A/B: Check if site.webmanifest exists (first manifest link)
-        try {
-          const manifestRes1 = await fetch('/site.webmanifest');
-          await log('site.webmanifest fetch result', { hypothesis: 'A-B', status: manifestRes1.status, ok: manifestRes1.ok, url: '/site.webmanifest' });
-        } catch(e) {
-          await log('site.webmanifest fetch ERROR', { hypothesis: 'A-B', error: e.message });
-        }
-        
-        // Check if manifest.json exists (second manifest link)
-        try {
-          const manifestRes2 = await fetch('/manifest.json');
-          const manifestData = await manifestRes2.json();
-          await log('manifest.json fetch result', { hypothesis: 'A-B', status: manifestRes2.status, ok: manifestRes2.ok, icons: manifestData.icons?.map(i => i.src) });
-        } catch(e) {
-          await log('manifest.json fetch ERROR', { hypothesis: 'A-B', error: e.message });
-        }
-        
-        // Hypothesis C: Check icon accessibility
-        const iconsToCheck = ['/icons/icon-192.png', '/icons/icon-512.png', '/web-app-manifest-192x192.png', '/web-app-manifest-512x512.png'];
-        for (const icon of iconsToCheck) {
-          try {
-            const res = await fetch(icon, { method: 'HEAD' });
-            await log('Icon check', { hypothesis: 'C', icon, status: res.status, ok: res.ok });
-          } catch(e) {
-            await log('Icon check ERROR', { hypothesis: 'C', icon, error: e.message });
-          }
-        }
-        
-        // Check all manifest links in document
-        const manifestLinks = document.querySelectorAll('link[rel="manifest"]');
-        await log('Manifest links found', { hypothesis: 'A', count: manifestLinks.length, hrefs: Array.from(manifestLinks).map(l => l.href) });
-      })();
-      // #endregion
-      
       if ('serviceWorker' in navigator) {
         // Register when DOM is ready (earlier than window.load for better reliability)
         const registerSW = () => {
-          // #region agent log
-          fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:sw-register-start',message:'SW registration starting',data:{hypothesis:'D'},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
-          // #endregion
-          
           navigator.serviceWorker.register('/sw.js', { scope: '/' })
             .then(registration => {
               console.log('[PWA] Service worker registered:', registration.scope);
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:sw-register-success',message:'SW registered successfully',data:{hypothesis:'D',scope:registration.scope,active:!!registration.active},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
-              // #endregion
             })
             .catch(error => {
               console.error('[PWA] Service worker registration failed:', error);
-              // #region agent log
-              fetch('http://127.0.0.1:7242/ingest/bbeae9bf-8eb7-41dc-9639-4ea255cdd7a2',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'index.html:sw-register-error',message:'SW registration FAILED',data:{hypothesis:'D',error:error.message},timestamp:Date.now(),sessionId:'debug-session'})}).catch(()=>{});
-              // #endregion
             });
         };
         
@@ -194,7 +145,6 @@
           registerSW();
         }
       }
-      
     </script>
   </body>
 </html>
