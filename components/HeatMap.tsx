@@ -168,3 +168,4 @@ const HeatMap: React.FC<HeatMapProps> = ({ reports }) => {
 };
 
 export default HeatMap;
+

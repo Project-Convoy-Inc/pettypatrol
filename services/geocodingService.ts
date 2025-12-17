@@ -129,3 +129,4 @@ export async function getAddressFromCoordinates(lat: number, lng: number): Promi
     return `${lat.toFixed(4)}, ${lng.toFixed(4)}`;
   }
 }
+

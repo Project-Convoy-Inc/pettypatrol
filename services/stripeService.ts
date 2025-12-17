@@ -62,3 +62,4 @@ export async function verifyPayment(sessionId: string): Promise<VerifyPaymentRes
     throw error;
   }
 }
+

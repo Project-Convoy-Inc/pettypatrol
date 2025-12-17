@@ -107,3 +107,39 @@ export const saveDealClaimToSupabase = async (deal: Deal): Promise<void> => {
   }
 };
 
+// Save beta tester info to Supabase
+export const saveBetaTesterToSupabase = async (name?: string, email?: string): Promise<void> => {
+  if (!supabase) {
+    console.warn('Supabase not configured - skipping save');
+    return;
+  }
+
+  // Only save if at least one field is provided
+  if (!name && !email) {
+    return;
+  }
+
+  try {
+    const deviceId = getDeviceId();
+    
+    const { error } = await supabase
+      .from('beta_testers')
+      .upsert(
+        {
+          device_id: deviceId,
+          name: name || null,
+          email: email || null,
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'device_id' }
+      );
+
+    if (error) {
+      console.error('Error saving beta tester to Supabase:', error);
+    }
+  } catch (error) {
+    console.error('Error saving beta tester to Supabase:', error);
+  }
+};
+
+

@@ -68,3 +68,31 @@ CREATE POLICY IF NOT EXISTS "Allow service role read on deals" ON deals
   FOR SELECT TO service_role
   USING (true);
 
+-- Table for beta testers
+CREATE TABLE IF NOT EXISTS beta_testers (
+  id BIGSERIAL PRIMARY KEY,
+  device_id TEXT NOT NULL UNIQUE,
+  name TEXT,
+  email TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Enable RLS for beta_testers
+ALTER TABLE beta_testers ENABLE ROW LEVEL SECURITY;
+
+-- Policy: Allow anonymous upserts on beta_testers
+CREATE POLICY IF NOT EXISTS "Allow anonymous upserts on beta_testers" ON beta_testers
+  FOR INSERT TO anon
+  WITH CHECK (true);
+
+CREATE POLICY IF NOT EXISTS "Allow anonymous updates on beta_testers" ON beta_testers
+  FOR UPDATE TO anon
+  USING (true)
+  WITH CHECK (true);
+
+CREATE POLICY IF NOT EXISTS "Allow service role read on beta_testers" ON beta_testers
+  FOR SELECT TO service_role
+  USING (true);
+
+

@@ -3,14 +3,14 @@ import { ViewState, AnalysisResult, AnalysisType, Badge, Deal, LicensePlateRepor
 import { BEHAVIORS, INITIAL_BADGES, INITIAL_DEALS, ENABLE_DEBUG_TOOLS, STRIPE_PRICE_IDS } from './constants';
 import { analyzeImage } from './services/geminiService';
 import { trackView, trackEvent } from './services/posthog';
-import { saveReportToSupabase, saveBadgeToSupabase, saveDealClaimToSupabase } from './services/supabase';
+import { saveReportToSupabase, saveBadgeToSupabase, saveDealClaimToSupabase, saveBetaTesterToSupabase } from './services/supabase';
 import { getAddressFromCoordinates } from './services/geocodingService';
 import { createCheckoutSession, verifyPayment } from './services/stripeService';
 import BottomNav from './components/BottomNav';
 import Button from './components/Button';
 import HeatMap from './components/HeatMap';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon, Search, FileText, DollarSign, Lock, CheckCircle, Sparkles } from 'lucide-react';
+import { Camera, X, Check, AlertTriangle, AlertCircle, MapPin, ChevronRight, Upload, Ticket, Keyboard, Settings as SettingsIcon, Activity, Zap, Brain, Calendar, ImageOff, MessageSquare, Mail, Image as ImageIcon, Search, FileText, DollarSign, Lock, CheckCircle, Sparkles, Eye } from 'lucide-react';
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
 
 // Google Maps types
@@ -229,59 +229,89 @@ const Header: React.FC = () => (
   >
     <div className="flex justify-between items-center">
       <div>
-        <h1 className="text-2xl font-display font-black text-red-600 italic tracking-tighter transform -skew-x-12">
-          PETTY PATROL
-        </h1>
+        <div className="flex items-center gap-2">
+          <h1 className="text-2xl font-display font-black text-red-600 italic tracking-tighter transform -skew-x-12">
+            PETTY PATROL
+          </h1>
+          <span className="px-2 py-0.5 text-xs font-bold bg-red-100 text-red-600 rounded-full uppercase">
+            Beta
+          </span>
+        </div>
         <p className="text-xs font-bold text-zinc-400 tracking-wider">STAY SAFE. STAY PETTY.</p>
       </div>
     </div>
   </header>
 );
 
-const Onboarding: React.FC<{ onComplete: () => void; onShowAuthInfo: () => void }> = ({ onComplete, onShowAuthInfo }) => (
-  <div 
-    className="min-h-screen bg-red-600 text-white p-8 flex flex-col justify-center items-center text-center"
-    style={{ 
-      paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
-      paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
-      minHeight: '100dvh'
-    }}
-  >
-    <div className="mb-8 p-4 bg-white rounded-full shadow-xl flex items-center justify-center">
-      <img 
-        src="https://raw.githubusercontent.com/Project-Convoy-Inc/pettypatrol/main/mascot.png" 
-        alt="Petty Patrol Mascot" 
-        className="w-32 h-32 object-contain" 
-      />
-    </div>
-    <h1 className="text-4xl font-display font-black mb-4 italic">WELCOME TO THE CHAOS</h1>
-    <p className="text-lg font-medium opacity-90 mb-8 max-w-xs">
-      Catch drivers being bad. Claim sweet deals. Have some fun.
-    </p>
-    <div className="space-y-4 w-full max-w-xs text-left bg-red-700/30 p-6 rounded-2xl mb-8 border border-red-400/30">
-      <div className="flex gap-3">
-         <Camera className="shrink-0" />
-         <p className="text-sm">Passenger? Snap a pic of a plate.</p>
-      </div>
-      <div className="flex gap-3">
-         <Ticket className="shrink-0" />
-         <p className="text-sm">Scan Partner QR codes for free stuff.</p>
-      </div>
-    </div>
-    <p className="text-sm font-medium opacity-90 mb-4 italic">
-      You've been there too, but not today 😜
-    </p>
-    <Button onClick={onComplete} variant="secondary" size="lg" fullWidth>
-      Let's Roll
-    </Button>
-    <button
-      onClick={onShowAuthInfo}
-      className="mt-4 text-sm text-white/80 underline underline-offset-2 hover:text-white transition-colors"
+const Onboarding: React.FC<{ onComplete: (name?: string, email?: string) => void; onShowAuthInfo: () => void }> = ({ onComplete, onShowAuthInfo }) => {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+
+  return (
+    <div 
+      className="min-h-screen bg-red-600 text-white p-8 flex flex-col justify-center items-center text-center"
+      style={{ 
+        paddingTop: 'calc(2rem + env(safe-area-inset-top, 0px))',
+        paddingBottom: 'calc(2rem + env(safe-area-inset-bottom, 0px))',
+        minHeight: '100dvh'
+      }}
     >
-      Why don't I have to authenticate?
-    </button>
-  </div>
-);
+      <div className="mb-8 p-4 bg-white rounded-full shadow-xl flex items-center justify-center">
+        <img 
+          src="https://raw.githubusercontent.com/Project-Convoy-Inc/pettypatrol/main/mascot.png" 
+          alt="Petty Patrol Mascot" 
+          className="w-32 h-32 object-contain" 
+        />
+      </div>
+      <h1 className="text-4xl font-display font-black mb-4 italic">WELCOME TO THE CHAOS</h1>
+      <p className="text-lg font-medium opacity-90 mb-8 max-w-xs">
+        Catch drivers being bad. Claim sweet deals. Have some fun.
+      </p>
+      <div className="space-y-4 w-full max-w-xs text-left bg-red-700/30 p-6 rounded-2xl mb-8 border border-red-400/30">
+        <div className="flex gap-3">
+           <Eye className="shrink-0" />
+           <p className="text-sm">Found one? Improve your memory by remembering the plate.</p>
+        </div>
+        <div className="flex gap-3">
+           <Camera className="shrink-0" />
+           <p className="text-sm">Passenger? Snap a pic of a plate.</p>
+        </div>
+        <div className="flex gap-3">
+           <Ticket className="shrink-0" />
+           <p className="text-sm">Scan Partner QR codes for free stuff.</p>
+        </div>
+      </div>
+      <p className="text-sm font-medium opacity-90 mb-4 italic">
+        You've been there too, but not today 😜
+      </p>
+      <div className="w-full max-w-xs space-y-3 mb-6">
+        <input
+          type="text"
+          placeholder="Name (optional)"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+        />
+        <input
+          type="email"
+          placeholder="Email (optional)"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-white/30"
+        />
+      </div>
+      <Button onClick={() => onComplete(name || undefined, email || undefined)} variant="secondary" size="lg" fullWidth>
+        Let's Roll
+      </Button>
+      <button
+        onClick={onShowAuthInfo}
+        className="mt-4 text-sm text-white/80 underline underline-offset-2 hover:text-white transition-colors"
+      >
+        Why don't I have to authenticate?
+      </button>
+    </div>
+  );
+};
 
 // Auth Info Modal Component
 const AuthInfoModal: React.FC<{ onClose: () => void }> = ({ onClose }) => (
@@ -875,9 +905,10 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (view) {
       case ViewState.ONBOARDING:
-        return <Onboarding 
-          onComplete={() => {
+        return <Onboarding
+          onComplete={(name, email) => {
             trackEvent('onboarding_completed');
+            saveBetaTesterToSupabase(name, email);
             setView(ViewState.HOME);
           }}
           onShowAuthInfo={() => setShowAuthInfoModal(true)}
